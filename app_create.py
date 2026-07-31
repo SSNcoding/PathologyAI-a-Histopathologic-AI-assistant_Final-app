@@ -3,6 +3,8 @@ PathologyAI — AI-Powered Computational Pathology Platform
 Launch: streamlit run app_create.py
 """
 
+import importlib
+
 import streamlit as st
 
 from core.constants import NAV_APP, NAV_ICONS
@@ -18,25 +20,24 @@ from ui.theme import background_picker_control, current_palette, render_sidebar_
 # Public pages (no login required)
 from app_pages import about, contact, home, login, register
 
-# Authenticated app pages
-from app_pages import (
-    ai_analysis,
-    audit_log,
-    cell_detection,
-    comparison,
-    dashboard,
-    explainable_ai,
-    profile,
-    reports,
-    results_dashboard,
-    roi_annotation,
-    scan_queue,
-    settings,
-    slide_inventory,
-    statistics,
-    tissue_detection,
-    upload,
-)
+
+def _lazy_page(module_name: str):
+    """Defer importing an app_pages module until it's actually selected,
+    instead of loading every page's dependencies at app startup.
+
+    Several authenticated pages (AI Analysis, Explainable AI, Cell/Tissue
+    Detection, Upload, Scan Queue) transitively import torch, opencv, and
+    scikit-image via models/ and services/. Importing all app_pages modules
+    up front — as this used to do — loads that entire heavy stack into
+    memory before a single screen is shown, which is enough to blow past
+    memory/startup-time limits on constrained hosts (e.g. Streamlit
+    Community Cloud's free tier), even though it runs fine locally. Loading
+    each page's module only when a user actually navigates to it keeps cold
+    boot light and spreads the heavy imports out over time."""
+    def _render() -> None:
+        module = importlib.import_module(f"app_pages.{module_name}")
+        module.render()
+    return _render
 
 try:
     from streamlit_option_menu import option_menu
@@ -61,26 +62,29 @@ PUBLIC_PAGES = {
 }
 
 APP_PAGES = {
-    "Dashboard": dashboard.render,
-    "Upload": upload.render,
-    "AI Analysis": ai_analysis.render,
-    "Results Dashboard": results_dashboard.render,
-    "Explainable AI": explainable_ai.render,
-    "Tissue Detection": tissue_detection.render,
-    "Cell Detection": cell_detection.render,
-    "Statistics": statistics.render,
-    "Scan Queue": scan_queue.render,
-    "Slide Inventory": slide_inventory.render,
-    "Comparison": comparison.render,
-    "Patient Report": reports.render,
-    "ROI Annotation": roi_annotation.render,
-    "Audit Log": audit_log.render,
-    "Profile": profile.render,
-    "Settings": settings.render,
+    "Dashboard": _lazy_page("dashboard"),
+    "Upload": _lazy_page("upload"),
+    "AI Analysis": _lazy_page("ai_analysis"),
+    "Results Dashboard": _lazy_page("results_dashboard"),
+    "Explainable AI": _lazy_page("explainable_ai"),
+    "Tissue Detection": _lazy_page("tissue_detection"),
+    "Cell Detection": _lazy_page("cell_detection"),
+    "Statistics": _lazy_page("statistics"),
+    "Scan Queue": _lazy_page("scan_queue"),
+    "Slide Inventory": _lazy_page("slide_inventory"),
+    "Comparison": _lazy_page("comparison"),
+    "Patient Report": _lazy_page("reports"),
+    "ROI Annotation": _lazy_page("roi_annotation"),
+    "Audit Log": _lazy_page("audit_log"),
+    "Profile": _lazy_page("profile"),
+    "Settings": _lazy_page("settings"),
 }
 
 
 def _hex_to_rgb(hex_color: str) -> str:
+    """'#06B6D4' -> '6, 182, 212', for building an rgba() string. Needed
+    because the "selected" nav item wants a translucent accent tint, not a
+    flat fill, and the palette only stores solid hex values."""
     hex_color = hex_color.lstrip("#")
     return ", ".join(str(int(hex_color[i:i + 2], 16)) for i in (0, 2, 4))
 
@@ -88,6 +92,16 @@ def _hex_to_rgb(hex_color: str) -> str:
 def _render_nav_menu(options: list[str], default_index: int = 0) -> str:
     icons = [NAV_ICONS.get(o, "circle") for o in options]
     if _HAS_OPTION_MENU:
+        # streamlit-option-menu renders as an isolated custom component — it
+        # does NOT inherit assets/styles.css or our injected :root CSS
+        # variables, only whatever literal colors are passed through this
+        # `styles` dict. Previously this used "transparent" for the
+        # container/nav-link backgrounds, banking on the sidebar's own
+        # background showing through; that only worked in dark mode by
+        # coincidence, so switching to light mode left the nav stuck dark.
+        # Passing the current palette's real hex values here fixes it for
+        # every mode/preset rather than just the one it happened to look
+        # right in.
         palette = current_palette()
         accent_rgb = _hex_to_rgb(palette["accent_cyan"])
         return option_menu(
@@ -115,7 +129,10 @@ def _render_nav_menu(options: list[str], default_index: int = 0) -> str:
     return st.radio("Navigation", options, label_visibility="collapsed")
 
 
-# OAuth callback (only reachable if services/oauth_service.py is configured)
+
+# OAuth callback (only reachable if services/oauth_service.py is configured —
+# see its module docstring; a no-op otherwise). Checked before anything else
+# so a redirect back from the provider logs the user in immediately.
 if not is_authenticated():
     _oauth_userinfo = handle_oauth_callback()
     if _oauth_userinfo:
@@ -124,6 +141,9 @@ if not is_authenticated():
         log_action(_oauth_user, "login_sso", "Signed in via SSO")
         st.rerun()
 
+# Session expiry is checked once per rerun, before anything authenticated is
+# drawn — an idle session past SESSION_TIMEOUT_MINUTES gets logged out here
+# rather than silently letting stale credentials sit in session_state.
 if is_session_expired():
     expired_user = current_user()
     log_out()
@@ -169,7 +189,10 @@ with st.sidebar:
     st.caption("Computational pathology • Research & education use only • Not a medical device")
 
 if is_authenticated():
-    APP_PAGES.get(selection, dashboard.render)()
+    APP_PAGES.get(selection, _lazy_page("dashboard"))()
+    # Rendered last (not tied to the sidebar or any single page) and pinned
+    # via CSS position:fixed, so Hoot shows up on top of whatever page you're
+    # on rather than being confined to one tab — see ui/assistant_widget.py.
     render_floating_mascot()
 else:
     PUBLIC_PAGES.get(selection, home.render)()
