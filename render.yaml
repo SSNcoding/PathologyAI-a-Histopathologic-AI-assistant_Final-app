@@ -1,0 +1,15 @@
+# Render Blueprint — lets you deploy with "New +" -> "Blueprint" pointing at
+# this repo instead of filling in the New Web Service form by hand.
+# GROQ_API_KEY is marked sync:false so Render prompts you to paste it in
+# securely rather than storing it in this file.
+services:
+  - type: web
+    name: pathologyai
+    runtime: docker
+    plan: free
+    healthCheckPath: /_stcore/health
+    envVars:
+      - key: GROQ_API_KEY
+        sync: false
+      - key: PATHOLOGYAI_SECRET_KEY
+        generateValue: true

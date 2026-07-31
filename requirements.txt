@@ -1,0 +1,22 @@
+--extra-index-url https://download.pytorch.org/whl/cpu
+streamlit>=1.37.0
+streamlit-option-menu>=0.3.13
+opencv-python-headless>=4.9.0
+numpy>=1.26.0
+pandas>=2.2.0
+plotly>=5.22.0
+Pillow>=10.3.0
+torch>=2.2.0
+torchvision>=0.17.0
+reportlab>=4.2.0
+scikit-image>=0.23.0
+requests>=2.31.0
+
+# --- Optional integrations (uncomment what you use; each is documented at
+#     its call site so nothing above breaks if you leave these commented) ---
+# psycopg2-binary>=2.9.9   # PostgreSQL backend for db/database.py — set DATABASE_URL
+# fastapi>=0.111.0         # api/main.py — programmatic access to the analysis pipeline
+# uvicorn>=0.30.0          # ASGI server to run api/main.py
+# pydicom>=2.4.4           # services/dicom_export.py — DICOM SR-style report export
+# authlib>=1.3.1           # services/oauth_service.py — SSO/OAuth login (needs your own app creds)
+# pytest>=8.2.0            # test suite (tests/) — dev-only, not needed to run the app
