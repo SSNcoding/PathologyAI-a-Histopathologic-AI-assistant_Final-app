@@ -12,7 +12,7 @@ font = "sans serif"
 # (Render/Railway/Fly.io/Streamlit Cloud) set STREAMLIT_SERVER_HEADLESS=true
 # as an environment variable themselves, which overrides this file, so this
 # doesn't affect production deploys.
-headless = false
+headless = true
 enableCORS = false
 enableXsrfProtection = true
 
