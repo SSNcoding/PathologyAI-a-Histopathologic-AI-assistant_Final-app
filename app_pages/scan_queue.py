@@ -95,7 +95,7 @@ def render() -> None:
         progress.empty()
         st.success(f"Completed scan + analysis on {len(results)} slides.")
 
-    if st.session_state.batch_results:
+    if st.session_state.get("batch_results"):
         rows = []
         for r in st.session_state.batch_results:
             top = (r.get("findings") or [{}])[0]
